@@ -127,7 +127,10 @@ module ex_stage
     output [              riscv::PLEN-1:0] mem_paddr_o,
     output [          (riscv::XLEN/8)-1:0] lsu_rmask_o,
     output [          (riscv::XLEN/8)-1:0] lsu_wmask_o,
-    output [ariane_pkg::TRANS_ID_BITS-1:0] lsu_addr_trans_id_o
+    output [ariane_pkg::TRANS_ID_BITS-1:0] lsu_addr_trans_id_o,
+
+    output logic valu_ready_o,
+    input  logic valu_valid_i 
 );
 
   // -------------------------
@@ -165,6 +168,24 @@ module ex_stage
   logic [TRANS_ID_BITS-1:0] mult_trans_id;
   logic mult_valid;
 
+  // Dragon Core : VALU data silence operation
+  logic [31:0] valu_operand_a;
+  logic [31:0] valu_operand_b;
+  logic [31:0] valu_result;
+  assign valu_operand_a = valu_valid_i ? fu_data_i.operand_a : '0;
+  assign valu_operand_b = valu_valid_i ? fu_data_i.operand_b : '0;
+
+  valu #(
+      .CVA6Cfg(CVA6Cfg)
+  ) valu_i (
+      .clk_i,
+      .rst_ni,
+      .operand_a_i (valu_operand_a),
+      .operand_b_i (valu_operand_b),
+      .result_o (valu_result),
+      .valu_ready_o (valu_ready_o)
+  );
+
   // 1. ALU (combinatorial)
   // data silence operation
   fu_data_t alu_data;
@@ -193,7 +214,7 @@ module ex_stage
       .pc_i,
       .is_compressed_instr_i,
       // any functional unit is valid, check that there is no accidental mis-predict
-      .fu_valid_i ( alu_valid_i || lsu_valid_i || csr_valid_i || mult_valid_i || fpu_valid_i || acc_valid_i ) ,
+      .fu_valid_i ( alu_valid_i || lsu_valid_i || csr_valid_i || mult_valid_i || fpu_valid_i || acc_valid_i || valu_valid_i ) ,
       .branch_valid_i,
       .branch_comp_res_i(alu_branch_res),
       .branch_result_o(branch_result),
@@ -218,7 +239,7 @@ module ex_stage
       .csr_addr_o
   );
 
-  assign flu_valid_o = alu_valid_i | branch_valid_i | csr_valid_i | mult_valid;
+  assign flu_valid_o = alu_valid_i | branch_valid_i | csr_valid_i | mult_valid | valu_valid_i;
 
   // result MUX
   always_comb begin
@@ -234,6 +255,8 @@ module ex_stage
     end else if (mult_valid) begin
       flu_result_o   = mult_result;
       flu_trans_id_o = mult_trans_id;
+    end else if (valu_valid_i) begin  // Dragon Core : Output result
+      flu_result_o = valu_result;
     end
   end
 

@@ -75,6 +75,36 @@ int main(int argc, char* argv[]) {
     printf("image %s: %d instructions\n", stringify(MNIST_INPUT_IMAGE), (int)(instret));
     printf("image %s: %d cycles\n", stringify(MNIST_INPUT_IMAGE), (int)(cycles));
 
+    /*UDATA_T i0,i1,i2,i3;
+    DATA_T w0,w1,w2,w3;
+    uint32_t packed_inputs = 0;
+    uint32_t packed_weights = 0;
+    uint32_t result;
+    SUM_T weightedSum = 0;
+
+
+    i0 = 4;
+    i1 = 10;
+    i2 = 250;
+    i3 = 70;
+    w0 = 58;
+    w1 = 30;
+    w2 = -3;
+    w3 = -43;
+    result = 0;
+    packed_inputs = ((uint32_t)i0 << 24 | (uint32_t)i1 << 16 | (uint32_t)i2 << 8 | (uint32_t)i3);
+    packed_weights = ((uint32_t)(uint8_t)w0 << 24 | (uint32_t)(uint8_t)w1 << 16 | (uint32_t)(uint8_t)w2 << 8 | (uint32_t)(uint8_t)w3);
+    
+    asm volatile
+    (
+        "conv %[z], %[x], %[y]\n\t"
+        : [z] "=r" (result)
+        : [x] "r" (packed_inputs), [y] "r" (packed_weights)
+    );
+    printf("\nconv result: %08x\n", result);
+    weightedSum += (SUM_T)result;
+    printf("\nconv result: %08x\n", weightedSum);*/
+
 #ifdef OUTPUTFILE
     FILE *f = fopen("success_rate.txt", "w");
     if (f == NULL) {

@@ -28,6 +28,32 @@ static int clamp(int v, int lo, int hi) {
     }
 }
 
+// Dragon Core : modify macsOnRange to use "conv" custom instruction
+static void macsOnRangeConv(const UDATA_T* __restrict inputs,
+                        const WDATA_T* __restrict weights,
+                        SUM_T* __restrict weightedSum,
+                        int nb_iterations)
+{   
+    //int main_part = nb_iterations - (nb_iterations % 4);
+    uint32_t packed_inputs;
+    uint32_t packed_weights;
+    uint32_t result;
+
+    for (int iter = 0; iter < nb_iterations; iter+=4) {
+        packed_inputs = 0;
+        packed_weights = 0;
+        packed_inputs = ((uint32_t)inputs[iter+3] << 24 | (uint32_t)inputs[iter+2] << 16 | (uint32_t)inputs[iter+1] << 8 | (uint32_t)inputs[iter+0]);
+        packed_weights = ((uint32_t)(uint8_t)weights[iter+3] << 24 | (uint32_t)(uint8_t)weights[iter+2] << 16 | (uint32_t)(uint8_t)weights[iter+1] << 8 | (uint32_t)(uint8_t)weights[iter+0]);
+
+        asm volatile (
+            "conv %[result], %[inputs], %[weights]\n\t"
+            : [result] "=r" (result)
+            : [inputs] "r" (packed_inputs), [weights] "r" (packed_weights)
+        );
+        *weightedSum += result;
+    }
+}
+
 static void macsOnRange(const UDATA_T* __restrict inputs,
                         const WDATA_T* __restrict weights,
                         SUM_T* __restrict weightedSum,
@@ -166,7 +192,7 @@ static void convcellPropagate1(
                             && OUTPUTS_WIDTH == OUTPUTS_WIDTH_NOPAD)
                                 || sxMax - sxMin == KERNEL_WIDTH)))
                     {
-                        macsOnRange(
+                        macsOnRangeConv(
                             inputs + iOffset, 
                             weights + wOffset, 
                             &weightedSum,KERNEL_WIDTH * NB_CHANNELS);
@@ -262,7 +288,7 @@ static void fccellPropagateUDATA_T(
                                     * (iy + CHANNELS_HEIGHT * och);
 
             if (!wrapInRange && INPUT_MEM_STRIDE == NB_CHANNELS) {
-                macsOnRange(
+                macsOnRangeConv(
                     inputs + iOffset, 
                     weights + wOffset, 
                     &weightedSum, NB_CHANNELS * CHANNELS_WIDTH);

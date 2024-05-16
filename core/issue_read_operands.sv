@@ -77,11 +77,15 @@ module issue_read_operands
     input logic [CVA6Cfg.NrCommitPorts-1:0] we_gpr_i,
     input logic [CVA6Cfg.NrCommitPorts-1:0] we_fpr_i,
 
-    output logic stall_issue_o  // stall signal, we do not want to fetch any more entries
+    output logic stall_issue_o,  // stall signal, we do not want to fetch any more entries
     // committing instruction instruction
     // from scoreboard
     // input  scoreboard_entry     commit_instr_i,
     // output logic                commit_ack_o
+
+    // Dragon Core
+    input  logic valu_ready_i,
+    output logic valu_valid_o
 );
   logic stall;
   logic fu_busy;  // functional unit is busy
@@ -100,6 +104,7 @@ module issue_read_operands
   logic        branch_valid_q;
   logic        cvxif_valid_q;
   logic [31:0] cvxif_off_instr_q;
+  logic        valu_valid_q; // Dragon Core : VALU valid signal
 
   logic [TRANS_ID_BITS-1:0] trans_id_n, trans_id_q;
   fu_op operator_n, operator_q;  // operation to perform
@@ -134,6 +139,7 @@ module issue_read_operands
   assign cvxif_valid_o       = CVA6Cfg.CvxifEn ? cvxif_valid_q : '0;
   assign cvxif_off_instr_o   = CVA6Cfg.CvxifEn ? cvxif_off_instr_q : '0;
   assign stall_issue_o       = stall;
+  assign valu_valid_o        = valu_valid_q; //Dragon Core : enable control for the vector alu unit
   // ---------------
   // Issue Stage
   // ---------------
@@ -150,6 +156,7 @@ module issue_read_operands
       end else fu_busy = 1'b0;
       LOAD, STORE: fu_busy = ~lsu_ready_i;
       CVXIF: fu_busy = ~cvxif_ready_i;
+      VALU: fu_busy = ~valu_ready_i; // Dragon Core : fu_busy active on low level of ready signals
       default: fu_busy = 1'b0;
     endcase
   end
@@ -292,6 +299,7 @@ module issue_read_operands
       fpu_rm_q       <= 3'b0;
       csr_valid_q    <= 1'b0;
       branch_valid_q <= 1'b0;
+      valu_valid_q   <= 1'b0; // Dragon Core
     end else begin
       alu_valid_q    <= 1'b0;
       lsu_valid_q    <= 1'b0;
@@ -301,6 +309,7 @@ module issue_read_operands
       fpu_rm_q       <= 3'b0;
       csr_valid_q    <= 1'b0;
       branch_valid_q <= 1'b0;
+      valu_valid_q   <= 1'b0; // Dragon Core
       // Exception pass through:
       // If an exception has occurred simply pass it through
       // we do not want to issue this instruction
@@ -335,6 +344,9 @@ module issue_read_operands
           CSR: begin
             csr_valid_q <= 1'b1;
           end
+          VALU: begin
+            valu_valid_q <= 1'b1; // Dragon Core
+          end
           default: ;
         endcase
       end
@@ -347,6 +359,7 @@ module issue_read_operands
         fpu_valid_q    <= 1'b0;
         csr_valid_q    <= 1'b0;
         branch_valid_q <= 1'b0;
+        valu_valid_q   <= 1'b0; // Dragon Core
       end
     end
   end
